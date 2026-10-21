@@ -72,6 +72,12 @@ npm run typecheck  # type-check only
 
 The whole app is in `src/main.ts`.
 
+## Support
+
+If you find this project useful, you can support it here:
+
+<a href="https://buymeacoffee.com/abin95x"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
+
 ## License
 
 [MIT](LICENSE)
