@@ -5,6 +5,7 @@
   "description": "Minimal WhatsApp Web desktop client for Linux",
   "main": "dist/main.js",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
