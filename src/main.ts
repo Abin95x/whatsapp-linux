@@ -1,6 +1,7 @@
-const { app, BrowserWindow, Menu, shell } = require('electron');
-const path = require('path');
-const fs = require('fs');
+import { app, BrowserWindow, Menu, shell } from 'electron';
+import type { MenuItemConstructorOptions, Rectangle } from 'electron';
+import path from 'node:path';
+import fs from 'node:fs';
 
 const APP_ID = 'whatsapp-desktop';
 const APP_URL = 'https://web.whatsapp.com/';
@@ -21,57 +22,59 @@ if (!app.requestSingleInstanceLock()) {
   process.exit(0);
 }
 
-let win;
+interface WindowState extends Partial<Rectangle> {
+  maximized?: boolean;
+}
+
+let win: BrowserWindow | null = null;
+let saveTimer: NodeJS.Timeout | undefined;
 const stateFile = path.join(app.getPath('userData'), 'window-state.json');
 
-function loadState() {
+function loadState(): WindowState {
   try {
-    return JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    return JSON.parse(fs.readFileSync(stateFile, 'utf8')) as WindowState;
   } catch {
     return { width: 1200, height: 800 };
   }
 }
 
-let saveTimer;
-
-function saveState() {
+function saveState(): void {
   clearTimeout(saveTimer);
   if (!win || win.isDestroyed()) return;
-  const state = { ...win.getNormalBounds(), maximized: win.isMaximized() };
+  const state: WindowState = { ...win.getNormalBounds(), maximized: win.isMaximized() };
   try {
     fs.writeFileSync(stateFile, JSON.stringify(state));
   } catch {}
 }
 
 // resize/move fire many times per second while dragging; write once it settles.
-function scheduleSave() {
+function scheduleSave(): void {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveState, 500);
 }
 
-function showWindow() {
+function showWindow(): void {
   if (!win) return;
   if (win.isMinimized()) win.restore();
   win.show();
   win.focus();
 }
 
-function isWhatsAppUrl(url) {
+function isWhatsAppUrl(url: string): boolean {
   try {
-    const host = new URL(url).hostname;
-    return host === 'web.whatsapp.com';
+    return new URL(url).hostname === 'web.whatsapp.com';
   } catch {
     return false;
   }
 }
 
-function buildMenu() {
-  const template = [
+function buildMenu(): void {
+  const template: MenuItemConstructorOptions[] = [
     {
       label: 'App',
       submenu: [
-        { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: () => win.webContents.reload() },
-        { label: 'Force Reload', accelerator: 'CmdOrCtrl+Shift+R', click: () => win.webContents.reloadIgnoringCache() },
+        { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: () => win?.webContents.reload() },
+        { label: 'Force Reload', accelerator: 'CmdOrCtrl+Shift+R', click: () => win?.webContents.reloadIgnoringCache() },
         { type: 'separator' },
         { label: 'Quit', accelerator: 'CmdOrCtrl+Q', click: () => app.quit() },
       ],
@@ -96,9 +99,9 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function createWindow() {
+function createWindow(): void {
   const state = loadState();
-  win = new BrowserWindow({
+  const w = new BrowserWindow({
     x: state.x,
     y: state.y,
     width: state.width,
@@ -117,15 +120,17 @@ function createWindow() {
       sandbox: true,
     },
   });
+  win = w;
+  const wc = w.webContents;
 
-  if (state.maximized) win.maximize();
-  win.once('ready-to-show', () => win.show());
+  if (state.maximized) w.maximize();
+  w.once('ready-to-show', () => w.show());
 
-  const ses = win.webContents.session;
+  const ses = wc.session;
   ses.setUserAgent(CHROME_UA);
 
   // Notifications, mic (voice notes), camera, clipboard, fullscreen.
-  const allowed = new Set([
+  const allowed = new Set<string>([
     'notifications', 'media', 'clipboard-read', 'clipboard-sanitized-write',
     'fullscreen', 'mediaKeySystem',
   ]);
@@ -133,39 +138,39 @@ function createWindow() {
   ses.setPermissionCheckHandler((_wc, permission) => allowed.has(permission));
 
   // Open links outside WhatsApp in the default browser.
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (!isWhatsAppUrl(url)) shell.openExternal(url);
+  wc.setWindowOpenHandler(({ url }) => {
+    if (!isWhatsAppUrl(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
-  win.webContents.on('will-navigate', (e, url) => {
+  wc.on('will-navigate', (e, url) => {
     if (!isWhatsAppUrl(url)) {
       e.preventDefault();
-      shell.openExternal(url);
+      void shell.openExternal(url);
     }
   });
 
   // Unread count comes through the page title as "(N) WhatsApp".
   let badge = -1;
-  win.webContents.on('page-title-updated', (_e, title) => {
-    const m = title.match(/^\((\d+)\)/);
+  wc.on('page-title-updated', (_e, title) => {
+    const m = /^\((\d+)\)/.exec(title);
     const count = m ? parseInt(m[1], 10) : 0;
     if (count !== badge) app.setBadgeCount((badge = count));
   });
 
   // Recover from renderer crashes.
-  win.webContents.on('render-process-gone', () => win.webContents.reload());
+  wc.on('render-process-gone', () => wc.reload());
 
-  win.on('resize', scheduleSave);
-  win.on('move', scheduleSave);
-  win.on('close', saveState);
-  win.on('closed', () => { win = null; });
+  w.on('resize', scheduleSave);
+  w.on('move', scheduleSave);
+  w.on('close', saveState);
+  w.on('closed', () => { win = null; });
 
-  win.loadURL(APP_URL);
+  void w.loadURL(APP_URL);
 }
 
 app.on('second-instance', showWindow);
 
-app.whenReady().then(() => {
+void app.whenReady().then(() => {
   buildMenu();
   createWindow();
 });

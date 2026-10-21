@@ -13,8 +13,15 @@ command -v npm >/dev/null || { echo "npm is required"; exit 1; }
 mkdir -p "$APPDIR" "$(dirname "$BIN")" "$(dirname "$DESKTOP")" \
          "$ICONDIR/scalable/apps" "$ICONDIR/512x512/apps"
 
-cp -r "$SRC/src" "$SRC/assets" "$SRC/package.json" "$APPDIR/"
-(cd "$APPDIR" && npm install --no-audit --no-fund && node node_modules/electron/install.js)
+rm -rf "$APPDIR/src" "$APPDIR/dist"
+cp -r "$SRC/src" "$SRC/assets" "$SRC/package.json" "$SRC/tsconfig.json" "$APPDIR/"
+(
+  cd "$APPDIR"
+  npm install --no-audit --no-fund
+  node node_modules/electron/install.js
+  npm run build
+  npm prune --omit=dev --no-audit --no-fund
+)
 
 cat > "$BIN" <<LAUNCH
 #!/usr/bin/env bash
