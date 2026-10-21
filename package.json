@@ -1,0 +1,14 @@
+{
+  "name": "whatsapp-desktop",
+  "productName": "WhatsApp Desktop",
+  "version": "1.0.0",
+  "description": "Minimal WhatsApp Web desktop client for Linux",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron . --ozone-platform-hint=auto"
+  },
+  "dependencies": {
+    "electron": "44.6.0"
+  }
+}
